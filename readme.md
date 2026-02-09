@@ -22,10 +22,13 @@ POLICY_AGGRESSIVE (2): Scales up quickly (up to +4 threads) but down slowly (-1 
 
 
 
-# monitor_interval_ms (int, default: 250): How often (in milliseconds) the monitoring thread checks metrics and decides to scale.
-# scale_up_threshold (float, default: 0.75): Load ratio (active threads / total threads) above which scaling up may trigger.
-# scale_down_threshold (float, default: 0.25): Load ratio below which scaling down may trigger.
-# cpu_threshold (float, default: 0.80): CPU utilization (0.0-1.0) above which scaling is paused to avoid overload.
+monitor_interval_ms (int, default: 250): How often (in milliseconds) the monitoring thread checks metrics and decides to scale.
+
+scale_up_threshold (float, default: 0.75): Load ratio (active threads / total threads) above which scaling up may trigger.
+
+scale_down_threshold (float, default: 0.25): Load ratio below which scaling down may trigger.
+
+cpu_threshold (float, default: 0.80): CPU utilization (0.0-1.0) above which scaling is paused to avoid overload.
 
 
 
@@ -89,4 +92,5 @@ pool.shutdown()
 The scaling is fully automatic and driven by internal monitoring—no manual "commands" to scale threads. 
 If you need more custom rules, you'd have to extend the C code or implement logic in Python 
 (e.g., monitor get_metrics() and create/destroy pools dynamically, though that's inefficient). 
+
 
