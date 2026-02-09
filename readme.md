@@ -68,7 +68,7 @@ Usage Example
 # Python:
 import Multithread
 
-# Create a pool with custom config (e.g., aggressive scaling for bursty workloads)
+// Create a pool with custom config (e.g., aggressive scaling for bursty workloads)
 pool = adaptivethreadpool.AdaptiveThreadPool(
     min_threads=4,
     max_threads=64,
@@ -76,21 +76,22 @@ pool = adaptivethreadpool.AdaptiveThreadPool(
     scale_up_threshold=0.8
 )
 
-# Submit tasks (the pool will automatically scale based on load)
+// Submit tasks (the pool will automatically scale based on load)
 def my_task(x):
     print(f"Processing {x}")
 
 for i in range(100):
     pool.submit(my_task, args=(i,))
 
-# Check status
+// Check status
 print(pool.get_metrics())
 
-# Shut down when done
+// Shut down when done
 pool.shutdown()
 
 The scaling is fully automatic and driven by internal monitoring—no manual "commands" to scale threads. 
 If you need more custom rules, you'd have to extend the C code or implement logic in Python 
 (e.g., monitor get_metrics() and create/destroy pools dynamically, though that's inefficient). 
+
 
 
