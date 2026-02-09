@@ -1,97 +1,126 @@
-# Seriously, a work in progress, just prototyping methods to do this for now. 
+# Multithread — Adaptive Thread Pool for Python 3.14 Free-Threading
 
+**Repository:** [github.com/TheMapleseed/Multithread](https://github.com/TheMapleseed/Multithread) · **Version:** 0.0.1 (Alpha)
 
-Multithread provides a Python class called AdaptiveThreadPool which implements a dynamic, self-adjusting thread pool for task execution. It's not "static" in the sense that it automatically scales the number of worker threads up or down based on workload, system resources (like CPU utilization and queue depth), and the configured scaling policy. However, it does expose methods ("commands") for interacting with it, and it's highly configurable during initialization. There's no explicit "ruleset" API for custom rules (e.g., no way to define arbitrary conditional logic at runtime), but the scaling behavior can be tuned via parameters to approximate different rule-like behaviors.
+**Multithread** is a high-performance C extension that implements an adaptive thread pool for Python 3.14's free-threading mode (no-GIL). It provides CPU-bound parallelism with load-aware scaling: thread count adjusts automatically from system resources and queue depth, then shuts down cleanly when you call `shutdown(wait=True)`.
 
-# Initialization and Configuration
+## Overview
 
-You create an instance of Multithread with optional parameters to customize its behavior. These are passed to the constructor (e.g., pool = adaptive_threadpool.AdaptiveThreadPool(min_threads=4, ...)). 
+The pool scales worker threads up and down based on workload, CPU utilization, queue depth, and a configurable policy (conservative, balanced, aggressive). Resource monitoring runs in a dedicated C-level thread; scaling uses soft and hard limits so the pool stays within bounds.
 
+## Key Features
 
-Here's a breakdown of the configurable options:min_threads (int, default: 2): Minimum number of worker threads to maintain.
-max_threads (int, default: 32): Maximum number of worker threads (also used as the default hard limit).
+- **Adaptive scaling:** Three policies (conservative, balanced, aggressive) control how quickly the pool scales up or down.
+- **Priority queue:** Tasks can set a priority (lower number = higher priority).
+- **Metrics:** `get_metrics()` returns CPU, memory, thread counts, queue depth, task counts, and average task duration.
+- **Clean shutdown:** `shutdown(wait=True)` drains the queue and returns when all tasks are done; `submit()` after shutdown raises `RuntimeError`.
 
-soft_limit (int, default: 8): Soft cap on threads; can be exceeded under high load but prefers to stay below this.
-hard_limit (int, default: 32): Absolute maximum threads; cannot be exceeded.
+## Requirements
 
-policy (int, default: POLICY_BALANCED): Scaling strategy. Use one of the module constants:POLICY_CONSERVATIVE (0): Scales up slowly (e.g., +1 thread when load is high) but down quickly (e.g., -2 when idle).
+- **Python 3.14** with free-threading (no-GIL). Use the free-threaded build, often installed as `python3.14t`. You need **setuptools** for that interpreter (e.g. `python3.14t -m pip install setuptools wheel`) to build from source.
+- **Clang** (C23). The project is built with Clang only.
+- **Linux:** `/proc/stat` for CPU metrics. **macOS:** Mach APIs. Tested on x86_64 and ARM64.
 
-POLICY_BALANCED (1): Moderate scaling in both directions based on queue depth and load.
-POLICY_AGGRESSIVE (2): Scales up quickly (up to +4 threads) but down slowly (-1 when very idle).
+## Installation
 
+**From PyPI (when published):** `pip install multithread`
 
+**From source (current instructions):**
 
+1. Ensure Python 3.14 with free-threading and Clang are installed. If your only Python is the free-threaded build, use it as `python3.14t` or set `PYTHON=python3` when running `make`.
+2. Clone and build:
 
-monitor_interval_ms (int, default: 250): How often (in milliseconds) the monitoring thread checks metrics and decides to scale.
+```bash
+git clone https://github.com/TheMapleseed/Multithread
+cd Multithread
 
-scale_up_threshold (float, default: 0.75): Load ratio (active threads / total threads) above which scaling up may trigger.
+# Verify (optional)
+python3.14t --version
+python3.14t -c "import sys; print('Free-threading:', getattr(sys, '_is_gil_disabled', lambda: False)())"
+clang --version
 
-scale_down_threshold (float, default: 0.25): Load ratio below which scaling down may trigger.
+# Build and validate (recommended)
+make validate
+```
 
-cpu_threshold (float, default: 0.80): CPU utilization (0.0-1.0) above which scaling is paused to avoid overload.
+**Make targets:**
 
+| Target | Description |
+|--------|-------------|
+| `make build` | Build the C extension in-place. |
+| `make validate` | Build, then runtime test (scaling + shutdown), then full test suite. |
+| `make validate-quick` | Build and runtime test only. |
+| `make test` | Run full test suite (requires prior build). |
+| `make install` | Install system-wide (optional). |
+| `make clean` | Remove build artifacts. |
 
+**Validation** runs the runtime test, which confirms: import, pool creation, task execution, scaling under load, clean shutdown (queue drained), and that `submit()` after shutdown raises. Direct commands: `python3.14t validate.py` or `python3.14t runtime_test.py` (after building).
 
-These parameters allow you to "configure" the pool's automatic behavior to fit different workloads (e.g., set a conservative policy for resource-constrained environments). 
+**Other:** `make dev-build` (debug build), `make sanitize` (ASan/UBSan). Uninstall: `pip uninstall multithread`. Build problems: Clang 14+; Linux: `python3.14-dev` / `-devel`; macOS: `xcode-select --install`.
 
-Once initialized, the configuration is fixed—you can't change it at runtime without creating a new pool instance.
+## Usage
 
-Available Methods (Commands)The pool operates automatically after initialization (e.g., submitting tasks triggers execution and potential scaling),
-but you can interact with it via these methods:submit(callable, args=None, kwargs=None, priority=UINT64_MAX): Submits a task (a callable Python function) to the queue for execution. 
+```python
+import multithread
+import time
 
-args: Tuple of positional arguments for the callable.
-kwargs: Dict of keyword arguments for the callable.
-
-priority: Optional uint64 for priority queuing (lower number = higher priority; default is max value for lowest priority).
-
-Returns None on success; raises RuntimeError if the pool is shut down or enqueue fails.
-
-This is the primary way to "send commands" (i.e., work) to the pool.
-
-shutdown(wait=True): Shuts down the pool.wait: If True (default), waits for the task queue to drain before returning.
-After shutdown, no new tasks can be submitted.
-
-get_metrics(): Returns a dict of current runtime metrics for monitoring:cpu_utilization_percent: System CPU usage (0-100).
-memory_available_mb: Free system memory in MB.
-active_threads: Number of busy worker threads.
-idle_threads: Number of idle worker threads.
-current_threads: Total worker threads.
-queue_depth: Number of pending tasks.
-avg_task_duration_ms: Average task execution time in ms (simple moving average).
-total_submitted: Total tasks submitted since creation.
-total_completed: Total tasks completed since creation.
-
-get_config(): Returns a dict of the pool's configuration parameters (as set during init).
-
-Usage Example
-
-# Python:
-import Multithread
-
-// Create a pool with custom config (e.g., aggressive scaling for bursty workloads)
-pool = adaptivethreadpool.AdaptiveThreadPool(
-    min_threads=4,
-    max_threads=64,
-    policy=adaptive_threadpool.POLICY_AGGRESSIVE,
-    scale_up_threshold=0.8
+pool = multithread.AdaptiveThreadPool(
+    min_threads=2,
+    max_threads=16,
+    soft_limit=8,
+    hard_limit=16,
+    policy=multithread.POLICY_BALANCED,
+    monitor_interval_ms=250,
+    scale_up_threshold=0.75,
+    scale_down_threshold=0.25,
+    cpu_threshold=0.80,
 )
 
-// Submit tasks (the pool will automatically scale based on load)
-def my_task(x):
-    print(f"Processing {x}")
+def compute_fibonacci(n):
+    if n <= 1:
+        return n
+    return compute_fibonacci(n - 1) + compute_fibonacci(n - 2)
 
 for i in range(100):
-    pool.submit(my_task, args=(i,))
+    pool.submit(compute_fibonacci, args=(30,))
 
-// Check status
-print(pool.get_metrics())
+pool.submit(compute_fibonacci, args=(35,), priority=1)
+pool.submit(compute_fibonacci, args=(25,), priority=10)
 
-// Shut down when done
-pool.shutdown()
+metrics = pool.get_metrics()
+print(f"Active threads: {metrics['active_threads']}, Queue: {metrics['queue_depth']}")
 
-The scaling is fully automatic and driven by internal monitoring—no manual "commands" to scale threads. 
-If you need more custom rules, you'd have to extend the C code or implement logic in Python 
-(e.g., monitor get_metrics() and create/destroy pools dynamically, though that's inefficient). 
+pool.shutdown(wait=True)
+```
 
+## Configuration Parameters
 
+- **min_threads / max_threads:** Bounds on worker count.
+- **soft_limit / hard_limit:** Target and absolute cap; pool can exceed soft under load but never hard.
+- **policy:** `multithread.POLICY_CONSERVATIVE`, `POLICY_BALANCED`, or `POLICY_AGGRESSIVE`.
+- **monitor_interval_ms:** How often the monitor thread checks and may scale (default 250).
+- **scale_up_threshold / scale_down_threshold:** Activity ratios that trigger scale up/down (defaults 0.75 / 0.25).
+- **cpu_threshold:** Do not scale up if system CPU is above this (default 0.80).
 
+## Testing
+
+```bash
+make test
+# or: python3.14t test_multithread.py
+```
+
+Individual test classes: `python3.14t -m unittest test_multithread.TestCorrectnessBasic`, `test_multithread.TestPerformanceBenchmarks`, `test_multithread.TestResourceBehavior`.
+
+## Troubleshooting
+
+- **Tasks not running:** Check `get_metrics()` for thread count and queue depth; ensure the queue is not full.
+- **Low CPU despite queue depth:** Consider lowering `cpu_threshold`.
+- **Thread count thrashing:** Increase `monitor_interval_ms` or widen the gap between scale-up and scale-down thresholds.
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
+
+## Contributing
+
+Contributions welcome. Keep the C code C23-compliant and the test suite passing.
