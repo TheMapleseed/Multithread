@@ -1,0 +1,16 @@
+# Build
+build/
+dist/
+*.egg-info/
+*.so
+*.dylib
+*.o
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE / OS
+.DS_Store
