@@ -1,4 +1,4 @@
-Seriously, a work in progress, just prototyping methods to do this for now. 
+# Seriously, a work in progress, just prototyping methods to do this for now. 
 
 
 Multithread provides a Python class called AdaptiveThreadPool which implements a dynamic, self-adjusting thread pool for task execution. It's not "static" in the sense that it automatically scales the number of worker threads up or down based on workload, system resources (like CPU utilization and queue depth), and the configured scaling policy. However, it does expose methods ("commands") for interacting with it, and it's highly configurable during initialization. There's no explicit "ruleset" API for custom rules (e.g., no way to define arbitrary conditional logic at runtime), but the scaling behavior can be tuned via parameters to approximate different rule-like behaviors.
@@ -89,3 +89,4 @@ pool.shutdown()
 The scaling is fully automatic and driven by internal monitoring—no manual "commands" to scale threads. 
 If you need more custom rules, you'd have to extend the C code or implement logic in Python 
 (e.g., monitor get_metrics() and create/destroy pools dynamically, though that's inefficient). 
+
