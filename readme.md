@@ -38,7 +38,7 @@ python:
 import Multithread
 
 # Create a pool with custom config (e.g., aggressive scaling for bursty workloads)
-pool = adaptive_threadpool.AdaptiveThreadPool(
+pool = Multithread.Multithread(
     min_threads=4,
     max_threads=64,
     policy=adaptive_threadpool.POLICY_AGGRESSIVE,
@@ -59,5 +59,6 @@ print(pool.get_metrics())
 pool.shutdown()
 
 The scaling is fully automatic and driven by internal monitoring—no manual "commands" to scale threads. If you need more custom rules, you'd have to extend the C code or implement logic in Python (e.g., monitor get_metrics() and create/destroy pools dynamically, though that's inefficient). If this doesn't match what you meant by "module," provide more context!
+
 
 
